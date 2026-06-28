@@ -1,0 +1,100 @@
+name: Deploy API Docs to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy-docs:
+    name: Generate OpenAPI spec & deploy Swagger UI
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: temurin
+          cache: maven
+
+      - name: Build JAR (docs profile — stub BigQuery, no GCP credentials needed)
+        run: mvn package -DskipTests --no-transfer-progress
+
+      - name: Start app with docs profile
+        run: |
+          java -Dspring.profiles.active=docs \
+               -Dbigquery.project-id=docs-placeholder \
+               -jar target/*.jar &
+          # Wait up to 30 s for the app to become healthy
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8080/actuator/health > /dev/null; then
+              echo "App is up"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Download OpenAPI spec
+        run: |
+          mkdir -p docs
+          curl -sf http://localhost:8080/v3/api-docs -o docs/openapi.json
+          echo "OpenAPI spec downloaded ($(wc -c < docs/openapi.json) bytes)"
+
+      - name: Stop app
+        run: pkill -f 'finance-analytics' || true
+
+      - name: Create Swagger UI index.html
+        run: |
+          cat > docs/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Finance Analytics API Docs</title>
+            <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+          </head>
+          <body>
+            <div id="swagger-ui"></div>
+            <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+            <script>
+              SwaggerUIBundle({
+                url: 'openapi.json',
+                dom_id: '#swagger-ui',
+                presets: [
+                  SwaggerUIBundle.presets.apis,
+                  SwaggerUIBundle.SwaggerUIStandalonePreset
+                ],
+                layout: 'BaseLayout',
+                tryItOutEnabled: true
+              });
+            </script>
+          </body>
+          </html>
+          EOF
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

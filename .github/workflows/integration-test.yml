@@ -1,0 +1,33 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  integration-test:
+    name: Integration Tests (real BigQuery)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: temurin
+          cache: maven
+
+      - name: Write GCP service account credentials
+        run: |
+          echo '${{ secrets.GOOGLE_CREDENTIALS }}' > /tmp/gcp-key.json
+          echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-key.json" >> $GITHUB_ENV
+
+      - name: Run integration tests against BigQuery
+        run: mvn test --no-transfer-progress
+        env:
+          BQ_PROJECT: ${{ secrets.BQ_PROJECT }}
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp-key.json
+        # @EnabledIfEnvironmentVariable(named = "BQ_PROJECT") gates integration tests.
+        # Unit tests also run here (they are always safe to run again).
