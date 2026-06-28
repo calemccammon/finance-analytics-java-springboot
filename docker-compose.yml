@@ -1,0 +1,14 @@
+services:
+  finance-analytics:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      BQ_PROJECT: ${BQ_PROJECT}
+      GOOGLE_APPLICATION_CREDENTIALS: /gcp/credentials.json
+    volumes:
+      # Mount your local gcloud Application Default Credentials into the container.
+      # Set GOOGLE_APPLICATION_CREDENTIALS on your host to the ADC file path, e.g.:
+      #   Windows: C:\Users\<you>\AppData\Roaming\gcloud\application_default_credentials.json
+      #   macOS/Linux: ~/.config/gcloud/application_default_credentials.json
+      - ${GOOGLE_APPLICATION_CREDENTIALS}:/gcp/credentials.json:ro

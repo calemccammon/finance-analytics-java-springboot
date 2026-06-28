@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: finance-analytics
+  namespace: finance-analytics
+  labels:
+    app: finance-analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: finance-analytics
+  template:
+    metadata:
+      labels:
+        app: finance-analytics
+    spec:
+      containers:
+        - name: finance-analytics
+          image: ghcr.io/calemccammon/finance-analytics-java-springboot:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: BQ_PROJECT
+              valueFrom:
+                secretKeyRef:
+                  name: finance-analytics-secrets
+                  key: BQ_PROJECT
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: /gcp/credentials.json
+          volumeMounts:
+            - name: gcp-credentials
+              mountPath: /gcp
+              readOnly: true
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 30
+      volumes:
+        - name: gcp-credentials
+          secret:
+            secretName: gcp-credentials

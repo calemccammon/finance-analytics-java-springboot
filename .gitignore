@@ -30,3 +30,7 @@ target/
 !src/
 /tmp/
 gcp-key.json
+
+### Kubernetes secrets — never commit these ###
+k8s/secret.yaml
+k8s/*-secret.yaml

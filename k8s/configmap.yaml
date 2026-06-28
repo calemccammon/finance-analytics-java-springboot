@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: finance-analytics-config
+  namespace: finance-analytics
+data:
+  BQ_DATASET: finance_marts

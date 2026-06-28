@@ -25,18 +25,31 @@ Browse the interactive Swagger UI (no server required):
 
 ## Prerequisites
 
-- Java 21
-- Maven 3.9+
+- Java 21 + Maven 3.9+ (or Docker)
 - A GCP service account with BigQuery read access to the `finance_marts` dataset
 - The `data-engineer-finance-analytics` pipeline must have run at least once
 
 ## Running Locally
 
+**Option A — Maven:**
 ```bash
 export BQ_PROJECT=your-gcp-project-id
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
 
 mvn spring-boot:run
+```
+
+**Option B — Docker Compose:**
+```bash
+# Windows (PowerShell)
+$env:BQ_PROJECT = "your-gcp-project-id"
+$env:GOOGLE_APPLICATION_CREDENTIALS = "C:\Users\<you>\AppData\Roaming\gcloud\application_default_credentials.json"
+
+# macOS/Linux
+export BQ_PROJECT=your-gcp-project-id
+export GOOGLE_APPLICATION_CREDENTIALS=~/.config/gcloud/application_default_credentials.json
+
+docker compose up
 ```
 
 Then open:
@@ -65,6 +78,13 @@ Integration tests are gated by `@EnabledIfEnvironmentVariable(named = "BQ_PROJEC
 | `ci.yml` | Push + PR to main | Build + unit tests (no credentials needed) |
 | `integration-test.yml` | Push to main | Integration tests against real BigQuery |
 | `deploy-docs.yml` | Push to main | Generates OpenAPI spec → deploys Swagger UI to GitHub Pages |
+| `docker-publish.yml` | Push to main | Builds Docker image → pushes to GHCR |
+
+## Docker & Kubernetes
+
+The app ships as a Docker image published to [GitHub Container Registry](https://ghcr.io/calemccammon/finance-analytics-java-springboot).
+
+For Kubernetes deployment instructions (minikube + GKE Workload Identity), see [k8s/README.md](k8s/README.md).
 
 ## Tech Stack
 
@@ -75,7 +95,10 @@ Integration tests are gated by `@EnabledIfEnvironmentVariable(named = "BQ_PROJEC
 | Data source | Google BigQuery (`finance_marts` dataset) |
 | API docs | springdoc-openapi + Swagger UI |
 | Build | Maven |
+| Container | Docker (multi-stage) |
+| Orchestration | Kubernetes |
 | CI/CD | GitHub Actions |
+| Image registry | GitHub Container Registry (GHCR) |
 | Docs hosting | GitHub Pages |
 
 ## Project Structure
