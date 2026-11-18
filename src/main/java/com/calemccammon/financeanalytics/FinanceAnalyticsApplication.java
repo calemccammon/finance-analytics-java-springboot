@@ -11,7 +11,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
         title = "Finance Analytics API",
         version = "1.0.0",
         description = """
-            Read-only REST API over the finance_analytics BigQuery dataset.
+            Read-only REST API over the finance_marts BigQuery dataset.
             Data sourced from Yahoo Finance (stock prices) and FRED (macro indicators),
             transformed by dbt, and served from BigQuery.
 

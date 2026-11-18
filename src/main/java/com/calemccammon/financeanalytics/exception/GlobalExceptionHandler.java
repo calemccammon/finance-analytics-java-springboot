@@ -6,11 +6,17 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import java.time.Instant;
 
+/**
+ * The base class answers Spring MVC's own exceptions (unknown path, unsupported
+ * method and similar) with their proper status. Anything else is logged and
+ * returned as a 500 without exception details.
+ */
 @RestControllerAdvice
-public class GlobalExceptionHandler {
+public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
@@ -19,9 +25,8 @@ public class GlobalExceptionHandler {
         log.error("Unhandled exception [{}]: {}", ex.getClass().getName(), ex.getMessage(), ex);
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.INTERNAL_SERVER_ERROR,
-                ex.getClass().getSimpleName() + ": " + ex.getMessage());
+                "An unexpected error occurred.");
         problem.setTitle("Internal Server Error");
-        problem.setProperty("exceptionType", ex.getClass().getName());
         problem.setProperty("timestamp", Instant.now());
         return problem;
     }

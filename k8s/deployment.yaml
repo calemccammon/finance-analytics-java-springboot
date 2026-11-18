@@ -18,9 +18,12 @@ spec:
       containers:
         - name: finance-analytics
           image: ghcr.io/calemccammon/finance-analytics-java-springboot:latest
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: finance-analytics-config
           env:
             - name: BQ_PROJECT
               valueFrom:

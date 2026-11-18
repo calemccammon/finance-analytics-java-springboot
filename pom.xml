@@ -15,7 +15,7 @@
     <artifactId>finance-analytics</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>finance-analytics-java-springboot</name>
-    <description>Finance Analytics REST API — Spring Boot + BigQuery showcase</description>
+    <description>Read-only REST API serving finance analytics from BigQuery</description>
 
     <properties>
         <java.version>21</java.version>

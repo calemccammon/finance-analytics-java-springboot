@@ -55,8 +55,7 @@ public class StocksController {
         description = "Returns month-by-month return percentages for the specified ticker, " +
                       "most recent month first."
     )
-    @ApiResponse(responseCode = "200", description = "Monthly returns")
-    @ApiResponse(responseCode = "404", description = "Ticker not found or no data available")
+    @ApiResponse(responseCode = "200", description = "Monthly returns, or an empty array for an unknown ticker")
     public List<MonthlyReturn> monthlyReturns(
             @PathVariable @Parameter(description = "Ticker symbol", example = "AAPL") String ticker) {
         return service.getMonthlyReturns(ticker.toUpperCase());
