@@ -15,6 +15,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.LocalDate;
 import java.util.List;
 
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -80,5 +81,23 @@ class StocksControllerTest {
 
         mvc.perform(get("/api/stocks/aapl/monthly-returns").accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
+
+        verify(service).getMonthlyReturns("AAPL");
+    }
+
+    @Test
+    void unknownPath_returns404() throws Exception {
+        mvc.perform(get("/api/stocks/snapshot/unknown").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void unexpectedError_returns500WithoutExceptionDetails() throws Exception {
+        when(service.getSnapshot()).thenThrow(new IllegalStateException("internal detail"));
+
+        mvc.perform(get("/api/stocks/snapshot").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.detail").value("An unexpected error occurred."))
+                .andExpect(jsonPath("$.exceptionType").doesNotExist());
     }
 }

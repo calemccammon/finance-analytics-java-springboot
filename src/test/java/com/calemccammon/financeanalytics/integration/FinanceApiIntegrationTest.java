@@ -22,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Run locally:
  *   export GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json
  *   export BQ_PROJECT=your-project-id
- *   mvn test -Dgroups=integration
+ *   mvn test
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @EnabledIfEnvironmentVariable(named = "BQ_PROJECT", matches = ".+")

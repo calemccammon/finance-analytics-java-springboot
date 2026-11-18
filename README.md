@@ -49,7 +49,7 @@ Then open:
 | GET | `/api/sectors/summary` | Sector averages for the latest trading day |
 | GET | `/actuator/health` | Health check |
 
-All `/api` endpoints return a JSON array and take no query parameters. The ticker path variable is upper-cased before it is used.
+All `/api` endpoints return a JSON array and take no query parameters. The ticker path variable is upper-cased before it is used. An unknown ticker returns an empty array.
 
 ## How it works
 
@@ -81,9 +81,9 @@ src/main/java/com/calemccammon/financeanalytics/
 
 Each controller delegates to one service. Each service method holds one SQL statement as a text block, runs it through the `google-cloud-bigquery` client, and maps the result rows to a record. Every request runs a BigQuery query. There is no cache and no database other than BigQuery.
 
-The queries read two tables in `finance_marts`: `fct_daily_trading` (one row per ticker per trading date, with prices, moving averages, volatility and the macro indicators for that date) and `dim_company` (industry, market cap category and exchange, used only by the snapshot endpoint). The project comes from the `BQ_PROJECT` environment variable. The dataset name is set in `application.properties`.
+The queries read two tables in `finance_marts`: `fct_daily_trading` (one row per ticker per trading date, with prices, moving averages, volatility and the macro indicators for that date) and `dim_company` (industry, market cap category and exchange, used only by the snapshot endpoint). The project comes from the `BQ_PROJECT` environment variable. The dataset name comes from `BQ_DATASET` and defaults to `finance_marts`.
 
-`GlobalExceptionHandler` logs any exception and returns it as an RFC 7807 problem response with status 500.
+Errors are returned as RFC 7807 problem responses. `GlobalExceptionHandler` extends Spring's `ResponseEntityExceptionHandler`, which answers framework errors such as an unknown path or an unsupported method with their own status. Any other exception is logged and returned as a 500 with a generic detail message.
 
 ## Design notes
 
@@ -99,7 +99,7 @@ The queries read two tables in `finance_marts`: `fct_daily_trading` (one row per
 mvn test
 ```
 
-Without `BQ_PROJECT` set, this runs 10 controller tests using `@WebMvcTest` and MockMvc with the services mocked. They check routing, status codes and JSON field names, and need no GCP credentials.
+Without `BQ_PROJECT` set, this runs 12 controller tests using `@WebMvcTest` and MockMvc with the services mocked. They check routing, status codes, JSON field names and the error responses, and need no GCP credentials.
 
 With `BQ_PROJECT` and `GOOGLE_APPLICATION_CREDENTIALS` set, the same command also runs 7 integration tests in `FinanceApiIntegrationTest`. They start the application on a random port, call each endpoint against BigQuery, and assert a 200 response with a non-empty body. The class is gated by `@EnabledIfEnvironmentVariable(named = "BQ_PROJECT")` and is skipped otherwise.
 
@@ -124,13 +124,9 @@ All four workflows run on push to `main`. `ci.yml` also runs on pull requests.
 
 The `Dockerfile` is a two-stage build: Maven on Temurin 21 builds the JAR, and the runtime image is `eclipse-temurin:21-jre-alpine`. The image is published at `ghcr.io/calemccammon/finance-analytics-java-springboot`.
 
-The `k8s/` directory has a namespace, a single-replica Deployment with readiness and liveness probes on `/actuator/health`, a ClusterIP Service and a ConfigMap. [k8s/README.md](k8s/README.md) gives the steps for minikube, with credentials supplied as Kubernetes secrets, and describes the changes needed to use Workload Identity on GKE.
+The `k8s/` directory has a namespace, a single-replica Deployment with readiness and liveness probes on `/actuator/health`, a ClusterIP Service and a ConfigMap that sets `BQ_DATASET`. The Deployment uses `imagePullPolicy: IfNotPresent`, so an image built inside minikube is used in place of the one on GHCR. [k8s/README.md](k8s/README.md) gives the steps for minikube, with credentials supplied as Kubernetes secrets, and describes the changes needed to use Workload Identity on GKE.
 
 ## Limitations
 
 - There is no authentication, rate limiting, caching or pagination. `/api/macro/indicators` returns the full history in one response.
-- An unknown ticker returns 200 with an empty array. The OpenAPI annotations document a 404 for that case, which the code does not produce.
-- The exception handler maps every exception to a 500 response and includes the exception class and message in the body.
 - The unit tests mock the services, so the SQL and row mapping are exercised only by the integration tests against BigQuery.
-- The Kubernetes ConfigMap defines `BQ_DATASET`, but the Deployment does not reference it and the application reads the dataset name from `application.properties`.
-- The Deployment sets `imagePullPolicy: Always`, so it pulls the image from GHCR even when one has been built locally in minikube.

@@ -9,7 +9,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Spliterators;
 import java.util.stream.StreamSupport;
 
 @Service
@@ -53,14 +52,14 @@ public class StocksService {
 
         return query(sql, row -> new StockSnapshot(
                 row.get("ticker").getStringValue(),
-                row.get("company_name").getStringValue(),
-                row.get("sector").getStringValue(),
-                row.get("industry").getStringValue(),
-                row.get("market_cap_category").getStringValue(),
-                row.get("exchange").getStringValue(),
+                nullableString(row, "company_name"),
+                nullableString(row, "sector"),
+                nullableString(row, "industry"),
+                nullableString(row, "market_cap_category"),
+                nullableString(row, "exchange"),
                 nullable(row, "latest_close"),
                 nullable(row, "daily_return_pct"),
-                (long) row.get("volume").getDoubleValue(),
+                nullableLong(row, "volume"),
                 nullable(row, "sma_30d"),
                 nullable(row, "sma_200d"),
                 nullable(row, "volatility_20d_pct"),
@@ -100,8 +99,8 @@ public class StocksService {
 
         return query(sql, row -> new Performance52w(
                 row.get("ticker").getStringValue(),
-                row.get("company_name").getStringValue(),
-                row.get("sector").getStringValue(),
+                nullableString(row, "company_name"),
+                nullableString(row, "sector"),
                 nullable(row, "price_52w_ago"),
                 nullable(row, "price_now"),
                 nullable(row, "return_52w_pct"),
@@ -176,6 +175,16 @@ public class StocksService {
     private Double nullable(FieldValueList row, String field) {
         FieldValue fv = row.get(field);
         return fv.isNull() ? null : fv.getDoubleValue();
+    }
+
+    private Long nullableLong(FieldValueList row, String field) {
+        FieldValue fv = row.get(field);
+        return fv.isNull() ? null : Long.valueOf((long) fv.getDoubleValue());
+    }
+
+    private String nullableString(FieldValueList row, String field) {
+        FieldValue fv = row.get(field);
+        return fv.isNull() ? null : fv.getStringValue();
     }
 
     @FunctionalInterface

@@ -47,7 +47,7 @@ public class SectorsService {
             TableResult result = bigQuery.query(config);
             return StreamSupport.stream(result.iterateAll().spliterator(), false)
                     .map(row -> new SectorSummary(
-                            row.get("sector").getStringValue(),
+                            nullableString(row, "sector"),
                             (int) row.get("stock_count").getLongValue(),
                             nullable(row, "avg_daily_return_pct"),
                             nullable(row, "avg_volatility_20d_pct"),
@@ -63,5 +63,10 @@ public class SectorsService {
     private Double nullable(FieldValueList row, String field) {
         FieldValue fv = row.get(field);
         return fv.isNull() ? null : fv.getDoubleValue();
+    }
+
+    private String nullableString(FieldValueList row, String field) {
+        FieldValue fv = row.get(field);
+        return fv.isNull() ? null : fv.getStringValue();
     }
 }
