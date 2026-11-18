@@ -1,37 +1,21 @@
 # Finance Analytics Java Spring Boot
 
-A read-only REST API that serves finance analytics data from BigQuery, built as a showcase of Java 21 + Spring Boot 3 + Google Cloud BigQuery integration.
+A read-only REST API that serves stock and macroeconomic analytics from BigQuery. It is written in Java 21 with Spring Boot 3.3 and queries the `finance_marts` dataset produced by [data-engineer-finance-analytics](https://github.com/calemccammon/data-engineer-finance-analytics), which loads Yahoo Finance stock prices and FRED macro indicators and transforms them with dbt.
 
-Data is sourced from [data-engineer-finance-analytics](https://github.com/calemccammon/data-engineer-finance-analytics) — Yahoo Finance stock prices and FRED macro indicators, transformed by dbt.
+API reference (static Swagger UI on GitHub Pages): https://calemccammon.github.io/finance-analytics-java-springboot/
 
-## API Documentation
+No public instance of the API is hosted, so browsing the reference runs no BigQuery queries. The OpenAPI spec lists `http://localhost:8080` as its only server. The application has no CORS configuration, so to execute requests use the Swagger UI that the application serves itself when it runs locally.
 
-Browse the interactive Swagger UI (no server required):
-👉 **https://calemccammon.github.io/finance-analytics-java-springboot/**
+## Running locally
 
-> **"Try it out"** only works when you're running the app locally — the spec points to `http://localhost:8080`. No public server is exposed, so browsing the docs incurs no BigQuery costs.
+Prerequisites:
 
-## Endpoints
+- Java 21 and Maven, or Docker
+- GCP credentials with BigQuery read access to the `finance_marts` dataset
+- At least one completed run of the `data-engineer-finance-analytics` pipeline, so that the tables exist
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/stocks/snapshot` | Latest trading-day snapshot for all tickers |
-| GET | `/api/stocks/performance` | 52-week return leaders & laggards |
-| GET | `/api/stocks/{ticker}/monthly-returns` | Monthly returns for a single ticker |
-| GET | `/api/macro/indicators` | FRED macro indicator history |
-| GET | `/api/macro/vs-stocks` | Stock returns grouped by rate regime |
-| GET | `/api/sectors/summary` | Sector-level performance for the latest trading day |
-| GET | `/actuator/health` | Health check |
+With Maven:
 
-## Prerequisites
-
-- Java 21 + Maven 3.9+ (or Docker)
-- A GCP service account with BigQuery read access to the `finance_marts` dataset
-- The `data-engineer-finance-analytics` pipeline must have run at least once
-
-## Running Locally
-
-**Option A — Maven:**
 ```bash
 export BQ_PROJECT=your-gcp-project-id
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
@@ -39,13 +23,9 @@ export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
 mvn spring-boot:run
 ```
 
-**Option B — Docker Compose:**
-```bash
-# Windows (PowerShell)
-$env:BQ_PROJECT = "your-gcp-project-id"
-$env:GOOGLE_APPLICATION_CREDENTIALS = "C:\Users\<you>\AppData\Roaming\gcloud\application_default_credentials.json"
+With Docker Compose, which builds the image from the `Dockerfile` and mounts the credentials file read-only into the container:
 
-# macOS/Linux
+```bash
 export BQ_PROJECT=your-gcp-project-id
 export GOOGLE_APPLICATION_CREDENTIALS=~/.config/gcloud/application_default_credentials.json
 
@@ -53,78 +33,104 @@ docker compose up
 ```
 
 Then open:
+
 - Swagger UI: http://localhost:8080/swagger-ui.html
 - Health check: http://localhost:8080/actuator/health
 
-## Running Tests
+## Endpoints
 
-**Unit tests** (no GCP credentials required — BigQuery is mocked):
-```bash
-mvn test
-```
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/stocks/snapshot` | Latest trading-day row for every ticker, joined to company details |
+| GET | `/api/stocks/performance` | Return over the last 365 days per ticker, sorted from best to worst |
+| GET | `/api/stocks/{ticker}/monthly-returns` | Monthly returns for one ticker, most recent month first |
+| GET | `/api/macro/indicators` | Daily history of the FRED macro indicators |
+| GET | `/api/macro/vs-stocks` | Daily stock return statistics grouped by Federal Funds Rate regime |
+| GET | `/api/sectors/summary` | Sector averages for the latest trading day |
+| GET | `/actuator/health` | Health check |
 
-**Integration tests** (require real BigQuery):
-```bash
-export BQ_PROJECT=your-gcp-project-id
-export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
-mvn test
-```
-Integration tests are gated by `@EnabledIfEnvironmentVariable(named = "BQ_PROJECT")` — they are skipped automatically when `BQ_PROJECT` is not set.
+All `/api` endpoints return a JSON array and take no query parameters. The ticker path variable is upper-cased before it is used.
 
-## CI/CD
-
-| Workflow | Trigger | Description |
-|----------|---------|-------------|
-| `ci.yml` | Push + PR to main | Build + unit tests (no credentials needed) |
-| `integration-test.yml` | Push to main | Integration tests against real BigQuery |
-| `deploy-docs.yml` | Push to main | Generates OpenAPI spec → deploys Swagger UI to GitHub Pages |
-| `docker-publish.yml` | Push to main | Builds Docker image → pushes to GHCR |
-
-## Docker & Kubernetes
-
-The app ships as a Docker image published to [GitHub Container Registry](https://ghcr.io/calemccammon/finance-analytics-java-springboot).
-
-For Kubernetes deployment instructions (minikube + GKE Workload Identity), see [k8s/README.md](k8s/README.md).
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|------------|
-| Language | Java 21 |
-| Framework | Spring Boot 3.3 |
-| Data source | Google BigQuery (`finance_marts` dataset) |
-| API docs | springdoc-openapi + Swagger UI |
-| Build | Maven |
-| Container | Docker (multi-stage) |
-| Orchestration | Kubernetes |
-| CI/CD | GitHub Actions |
-| Image registry | GitHub Container Registry (GHCR) |
-| Docs hosting | GitHub Pages |
-
-## Project Structure
+## How it works
 
 ```
 src/main/java/com/calemccammon/financeanalytics/
 ├── FinanceAnalyticsApplication.java
 ├── config/
-│   ├── BigQueryConfig.java        # Real BigQuery bean (requires GOOGLE_APPLICATION_CREDENTIALS)
-│   ├── BigQueryDocsConfig.java    # Stub bean for docs profile (no credentials needed)
-│   └── OpenApiConfig.java         # Swagger UI server configuration
+│   ├── BigQueryConfig.java        # BigQuery client bean (all profiles except docs)
+│   ├── BigQueryDocsConfig.java    # Stub BigQuery bean for the docs profile
+│   └── OpenApiConfig.java         # Sets the server URL in the OpenAPI spec
 ├── controller/
 │   ├── StocksController.java
 │   ├── MacroController.java
 │   └── SectorsController.java
 ├── exception/
 │   └── GlobalExceptionHandler.java
-├── model/                          # Java records (DTOs)
+├── model/                          # Java records returned as JSON
 │   ├── StockSnapshot.java
 │   ├── Performance52w.java
 │   ├── MonthlyReturn.java
 │   ├── MacroIndicator.java
 │   ├── MacroVsStocks.java
 │   └── SectorSummary.java
-└── service/
-    ├── StocksService.java          # BigQuery SQL for stocks endpoints
+└── service/                        # BigQuery SQL and row mapping
+    ├── StocksService.java
     ├── MacroService.java
     └── SectorsService.java
 ```
+
+Each controller delegates to one service. Each service method holds one SQL statement as a text block, runs it through the `google-cloud-bigquery` client, and maps the result rows to a record. Every request runs a BigQuery query. There is no cache and no database other than BigQuery.
+
+The queries read two tables in `finance_marts`: `fct_daily_trading` (one row per ticker per trading date, with prices, moving averages, volatility and the macro indicators for that date) and `dim_company` (industry, market cap category and exchange, used only by the snapshot endpoint). The project comes from the `BQ_PROJECT` environment variable. The dataset name is set in `application.properties`.
+
+`GlobalExceptionHandler` logs any exception and returns it as an RFC 7807 problem response with status 500.
+
+## Design notes
+
+- **Percentages are returned as decimal fractions.** The marts store rates and returns as whole percentages (5.0 means 5%). The SQL divides by 100, so a field such as `dailyReturnPct` or `fedFundsRate` holds 0.05 for 5%. `cpi` is an index value and is returned unchanged.
+- **Rate regimes use the stored percentage values.** `/api/macro/vs-stocks` buckets rows by `fed_funds_rate` at thresholds of 5, 3 and 1 percent.
+- **Macro history is read from one ticker's rows.** The macro indicators are repeated on every ticker's row in `fct_daily_trading`. `/api/macro/indicators` filters to `ticker = 'AAPL'` to get one row per trading date, so it depends on AAPL being in the dataset.
+- **The ticker is a bound query parameter.** `/api/stocks/{ticker}/monthly-returns` passes the ticker to BigQuery as a named parameter and does not interpolate it into the SQL.
+- **The docs profile starts the application without credentials.** Under the `docs` Spring profile the BigQuery bean is a proxy that throws on any call. The `deploy-docs.yml` workflow starts the application with this profile, downloads `/v3/api-docs`, and publishes it with a Swagger UI page to GitHub Pages.
+
+## Testing
+
+```bash
+mvn test
+```
+
+Without `BQ_PROJECT` set, this runs 10 controller tests using `@WebMvcTest` and MockMvc with the services mocked. They check routing, status codes and JSON field names, and need no GCP credentials.
+
+With `BQ_PROJECT` and `GOOGLE_APPLICATION_CREDENTIALS` set, the same command also runs 7 integration tests in `FinanceApiIntegrationTest`. They start the application on a random port, call each endpoint against BigQuery, and assert a 200 response with a non-empty body. The class is gated by `@EnabledIfEnvironmentVariable(named = "BQ_PROJECT")` and is skipped otherwise.
+
+```bash
+export BQ_PROJECT=your-gcp-project-id
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
+mvn test
+```
+
+## CI/CD
+
+All four workflows run on push to `main`. `ci.yml` also runs on pull requests.
+
+| Workflow | Description |
+|----------|-------------|
+| `ci.yml` | Runs `mvn test` without credentials (unit tests only) |
+| `integration-test.yml` | Runs `mvn test` with BigQuery credentials from repository secrets (unit and integration tests) |
+| `deploy-docs.yml` | Generates the OpenAPI spec under the `docs` profile and deploys Swagger UI to GitHub Pages |
+| `docker-publish.yml` | Builds the Docker image and pushes it to GHCR, tagged `latest` and `sha-<commit>` |
+
+## Docker and Kubernetes
+
+The `Dockerfile` is a two-stage build: Maven on Temurin 21 builds the JAR, and the runtime image is `eclipse-temurin:21-jre-alpine`. The image is published at `ghcr.io/calemccammon/finance-analytics-java-springboot`.
+
+The `k8s/` directory has a namespace, a single-replica Deployment with readiness and liveness probes on `/actuator/health`, a ClusterIP Service and a ConfigMap. [k8s/README.md](k8s/README.md) gives the steps for minikube, with credentials supplied as Kubernetes secrets, and describes the changes needed to use Workload Identity on GKE.
+
+## Limitations
+
+- There is no authentication, rate limiting, caching or pagination. `/api/macro/indicators` returns the full history in one response.
+- An unknown ticker returns 200 with an empty array. The OpenAPI annotations document a 404 for that case, which the code does not produce.
+- The exception handler maps every exception to a 500 response and includes the exception class and message in the body.
+- The unit tests mock the services, so the SQL and row mapping are exercised only by the integration tests against BigQuery.
+- The Kubernetes ConfigMap defines `BQ_DATASET`, but the Deployment does not reference it and the application reads the dataset name from `application.properties`.
+- The Deployment sets `imagePullPolicy: Always`, so it pulls the image from GHCR even when one has been built locally in minikube.
