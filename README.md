@@ -99,9 +99,9 @@ Errors are returned as RFC 7807 problem responses. `GlobalExceptionHandler` exte
 mvn test
 ```
 
-Without `BQ_PROJECT` set, this runs 12 controller tests using `@WebMvcTest` and MockMvc with the services mocked. They check routing, status codes, JSON field names and the error responses, and need no GCP credentials.
+Without `BQ_PROJECT` set, this runs the controller tests, which use `@WebMvcTest` and MockMvc with the services mocked. They check routing, status codes, JSON field names and the error responses, and need no GCP credentials.
 
-With `BQ_PROJECT` and `GOOGLE_APPLICATION_CREDENTIALS` set, the same command also runs 7 integration tests in `FinanceApiIntegrationTest`. They start the application on a random port, call each endpoint against BigQuery, and assert a 200 response with a non-empty body. The class is gated by `@EnabledIfEnvironmentVariable(named = "BQ_PROJECT")` and is skipped otherwise.
+With `BQ_PROJECT` and `GOOGLE_APPLICATION_CREDENTIALS` set, the same command also runs the integration tests in `FinanceApiIntegrationTest`. They start the application on a random port, call each endpoint against BigQuery, and assert a 200 response with a non-empty body. The class is gated by `@EnabledIfEnvironmentVariable(named = "BQ_PROJECT")` and is skipped otherwise.
 
 ```bash
 export BQ_PROJECT=your-gcp-project-id
